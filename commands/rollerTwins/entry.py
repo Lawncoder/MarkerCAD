@@ -89,10 +89,10 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
   
     
-    inputs.addValueInput("roller_diameter", "Roller Diameter", defaultLengthUnits, adsk.core.ValueInput.createByReal(2))
-    inputs.addValueInput("c_c", "Center To Center", defaultLengthUnits, adsk.core.ValueInput.createByReal(3))
-    inputs.addValueInput("plate_thickness", "Plate Thickness", defaultLengthUnits, adsk.core.ValueInput.createByReal(0.125))
-    inputs.addValueInput('roller_length', "Roller Length", defaultLengthUnits, adsk.core.ValueInput.createByReal(10))
+    inputs.addValueInput("roller_diameter", "Roller Diameter", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*2))
+    inputs.addValueInput("c_c", "Center To Center", defaultLengthUnits, adsk.core.ValueInput.createByReal(3*2.54))
+    inputs.addValueInput("plate_thickness", "Plate Thickness", defaultLengthUnits, adsk.core.ValueInput.createByReal(0.125*2.54))
+    inputs.addValueInput('roller_length', "Roller Length", defaultLengthUnits, adsk.core.ValueInput.createByReal(10*2.54))
     inputs.addBoolValueInput('two_rollers', "Use Second Roller?", True)
     inputs.addBoolValueInput('two_plates', "Plates on Both Sides", True)
 

@@ -88,9 +88,9 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     stagesSliderInput = inputs.addIntegerSliderCommandInput("stages", "Stages", 1, 6)
     
-    inputs.addValueInput("max_extension", "Max Extension", 'in', adsk.core.ValueInput.createByReal(48))
-    inputs.addValueInput("carriage_height", "Carriage Height", 'in', adsk.core.ValueInput.createByReal(5))
-    inputs.addValueInput("carriage_width", "Carriage Width", 'in', adsk.core.ValueInput.createByReal(5))
+    inputs.addValueInput("max_extension", "Max Extension", 'in', adsk.core.ValueInput.createByReal(48*2.54))
+    inputs.addValueInput("carriage_height", "Carriage Height", 'in', adsk.core.ValueInput.createByReal(5*2.54))
+    inputs.addValueInput("carriage_width", "Carriage Width", 'in', adsk.core.ValueInput.createByReal(5*2.54))
 
 
     # TODO Connect to the events that are needed by this command.
@@ -127,7 +127,8 @@ def command_execute(args: adsk.core.CommandEventArgs):
     carriageWidth /= 2.54
     carriageHeight /= 2.54
     maxExtension /= 2.54
-    stageHeight = maxExtension / stages + 4.5
+    maxExtension -= 7
+    stageHeight = maxExtension / stages + 6
 
     if stageHeight < carriageHeight - 2:
         ui.messageBox('Stages are too short! Either decrease Carriage Height or Number of Stages or Increase Extension Length')
@@ -186,7 +187,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
             
             limits.slideLimits.isMaximumValueEnabled = True
             limits.slideLimits.isMinimumValueEnabled = True
-            limits.slideLimits.maximumValue = (stageHeight - 4.5) * 2.54
+            limits.slideLimits.maximumValue = (stageHeight - 6  - 1) * 2.54
             limits.slideLimits.minimumValue = 0
             if i == 0: limits.slideLimits.maximumValue = (stageHeight - 1 - carriageHeight) * 2.54
         
