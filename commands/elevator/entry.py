@@ -127,7 +127,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
     carriageWidth /= 2.54
     carriageHeight /= 2.54
     maxExtension /= 2.54
-    stageHeight = maxExtension / stages + 2
+    stageHeight = maxExtension / stages + 4.5
 
     if stageHeight < carriageHeight - 2:
         ui.messageBox('Stages are too short! Either decrease Carriage Height or Number of Stages or Increase Extension Length')
@@ -186,7 +186,7 @@ def command_execute(args: adsk.core.CommandEventArgs):
             
             limits.slideLimits.isMaximumValueEnabled = True
             limits.slideLimits.isMinimumValueEnabled = True
-            limits.slideLimits.maximumValue = (stageHeight - 2) * 2.54
+            limits.slideLimits.maximumValue = (stageHeight - 4.5) * 2.54
             limits.slideLimits.minimumValue = 0
             if i == 0: limits.slideLimits.maximumValue = (stageHeight - 1 - carriageHeight) * 2.54
         
