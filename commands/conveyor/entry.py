@@ -1,4 +1,7 @@
 import adsk.core
+import adsk.fusion
+from adsk.core import Vector3D as v3
+import math
 import os
 from ...lib import fusionAddInUtils as futil
 from ... import config
@@ -7,8 +10,8 @@ ui = app.userInterface
 
 
 # TODO *** Specify the command identity information. ***
-CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_cmdDialog'
-CMD_NAME = 'Command Dialog Sample'
+CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_Conveyor'
+CMD_NAME = 'Conveyor Creator'
 CMD_Description = 'A Fusion Add-in Command with a dialog'
 
 # Specify that the command will be promoted to the panel.
@@ -28,6 +31,8 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
 local_handlers = []
+
+
 
 
 # Executed when add-in is run.
@@ -72,6 +77,7 @@ def stop():
 # Function that is called when a user clicks the corresponding button in the UI.
 # This defines the contents of the command dialog and connects to the command related events.
 def command_created(args: adsk.core.CommandCreatedEventArgs):
+    ui.messageBox("created")
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Created Event')
 
@@ -80,13 +86,24 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # TODO Define the dialog for your command by adding different inputs to the command.
 
-    # Create a simple text box input.
-    inputs.addTextBoxCommandInput('text_box', 'Some Text', 'Enter some text.', 1, False)
 
     # Create a value input field and set the default using 1 unit of the default length unit.
     defaultLengthUnits = app.activeProduct.unitsManager.defaultLengthUnits
-    default_value = adsk.core.ValueInput.createByString('1')
-    inputs.addValueInput('value_input', 'Some Value', defaultLengthUnits, default_value)
+    try: 
+   
+        inputs.addValueInput('length', "Length", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*20 ))
+        inputs.addValueInput('width', "Width", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*20 ))
+        inputs.addValueInput('roller_diameter', "Roller Diameter", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*2 ))
+        inputs.addValueInput('belt_width', "Belt Thickness", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54 ))
+        inputs.addIntegerSliderListCommandInput('belt_count', "Number of Belts", [1,3,5,7,9,11])
+    except Exception as ex:
+        ui.messageBox(ex)
+    
+
+
+    
+
+    
 
     # TODO Connect to the events that are needed by this command.
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
@@ -104,16 +121,80 @@ def command_execute(args: adsk.core.CommandEventArgs):
 
     # TODO ******************************** Your code here ********************************
 
-    # Get a reference to your command's inputs.
-    inputs = args.command.commandInputs
-    text_box: adsk.core.TextBoxCommandInput = inputs.itemById('text_box')
-    value_input: adsk.core.ValueCommandInput = inputs.itemById('value_input')
+    design = adsk.fusion.Design.cast(app.activeProduct)
+    root = design.rootComponent
 
-    # Do something interesting
-    text = text_box.text
-    expression = value_input.expression
-    msg = f'Your text: {text}<br>Your value: {expression}'
-    ui.messageBox(msg)
+    inputs = args.command.commandInputs
+
+    # Get a reference to your command's inputs.
+    length = inputs.itemById('length').value
+    width = inputs.itemById('width').value
+   
+    roller_diameter = inputs.itemById('roller_diameter').value
+   
+    belt_width = inputs.itemById('belt_width').value
+
+    # DropDownCommandInputs — get selected item
+   
+   
+
+    # IntegerSpinnerCommandInput
+    belt_count = inputs.itemById('belt_count').valueOne
+
+    # (optional) if you need the index instead of the name:
+  
+    
+    
+    eighth = 2.54 * 0.125
+
+    #ok so my thought process is create everything then mirror it!
+
+    occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+    comp = occ.component
+
+    occ.activate()
+
+    #use xy for everything 
+    rollerSketch = comp.sketches.add(comp.xYConstructionPlane)
+
+    rollerSketch.sketchCurves.sketchCircles.addByCenterRadius(futil.pZero, roller_diameter/2 - eighth)
+    rollerSketch.sketchCurves.sketchCircles.addByCenterRadius(futil.pointFromOffset(futil.pZero, length/2.54 - 2, 0), roller_diameter/2 - eighth)
+
+    
+    rollerExtrudeInput = comp.features.extrudeFeatures.createInput(futil.collectionFromProfiles(rollerSketch.profiles), adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
+    rollerExtrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(width - 2.54*2)), adsk.fusion.ExtentDirections.PositiveExtentDirection)
+
+    comp.features.extrudeFeatures.add(rollerExtrudeInput)
+
+  
+
+    beltStart = 0.5 * 2.54
+    beltEnd = width - 1.5*2.54 - belt_width
+    
+    
+    if belt_count == 1:
+        interval = 0
+        beltStart = (beltEnd - beltStart) / 2
+    else:
+        interval = (beltEnd - beltStart)/(belt_count - 1)
+    for i in range(belt_count):
+        ui.messageBox(f"creating belt {i} of {belt_count}")
+        planeInput = comp.constructionPlanes.createInput(occ)
+        planeInput.setByOffset(comp.xYConstructionPlane, adsk.core.ValueInput.createByReal(beltStart + i * interval))
+        plane = comp.constructionPlanes.add(planeInput)
+        futil.createBelt(roller_diameter, belt_width, length - 2 * 2.54, plane, occ)
+   
+
+
+        
+
+        
+
+def pointFromOffset(reference:adsk.core.Point3D, offsetXInches, offsetYInches):
+    copy = reference.copy()
+    copy.translateBy(v3.create(offsetXInches*2.54, offsetYInches*2.54, 0))
+    return copy
+
 
 
 # This event handler is called when the command needs to compute a new preview in the graphics window.

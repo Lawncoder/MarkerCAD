@@ -6,6 +6,9 @@
 
 from .elevator import entry as elevator
 from .rollerTwins import entry as rollers
+from .conveyor import entry as conveyor
+from .rollersAlongPath import entry as rollersAlongPath
+from .arm import entry as arm
 
 
 # TODO add your imported modules to this list.
@@ -13,7 +16,10 @@ from .rollerTwins import entry as rollers
 commands = [
   
     elevator,
-    rollers
+    rollers,
+    conveyor,
+    rollersAlongPath,
+    arm
 
 ]
 

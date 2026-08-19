@@ -1,6 +1,7 @@
 import adsk.core
 import adsk.fusion
 from adsk.core import Vector3D as v3
+import math
 import os
 from ...lib import fusionAddInUtils as futil
 from ... import config
@@ -9,9 +10,9 @@ ui = app.userInterface
 
 
 # TODO *** Specify the command identity information. ***
-CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_Elevator'
-CMD_NAME = 'Elevator Generator'
-CMD_Description = 'A Fusion Add-in Command with a dialog'
+CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_Arm Segment'
+CMD_NAME = 'Arm Segment Assembler'
+CMD_Description = 'Creates a structure piece with a sprocket/tube plug at the end'
 
 # Specify that the command will be promoted to the panel.
 IS_PROMOTED = True
@@ -30,6 +31,8 @@ ICON_FOLDER = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'resource
 # Local list of event handlers used to maintain a reference so
 # they are not released and garbage collected.
 local_handlers = []
+
+
 
 
 # Executed when add-in is run.
@@ -74,6 +77,7 @@ def stop():
 # Function that is called when a user clicks the corresponding button in the UI.
 # This defines the contents of the command dialog and connects to the command related events.
 def command_created(args: adsk.core.CommandCreatedEventArgs):
+    ui.messageBox("created")
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Created Event')
 
@@ -85,13 +89,28 @@ def command_created(args: adsk.core.CommandCreatedEventArgs):
 
     # Create a value input field and set the default using 1 unit of the default length unit.
     defaultLengthUnits = app.activeProduct.unitsManager.defaultLengthUnits
-
-    stagesSliderInput = inputs.addIntegerSliderCommandInput("stages", "Stages", 1, 6)
+    try: 
+        typeDropdown = inputs.addDropDownCommandInput('type', "Structure Type", adsk.core.DropDownStyles.TextListDropDownStyle)
+        typeDropdown.tooltip = "Sets the tube of the arm segment's main support tube. Rectangular generates a block representation of general aluminum tubing (2x1, 1x1, 2x2 for example), while Cylindrical generates a circular tube for structure (MAXSpline or 3/4\" OD Tube for example)"
+        typeDropdown.listItems.add("Rectangular", True)
+        typeDropdown.listItems.add("Cylindrical", False)
+        inputs.addValueInput('length', "Length", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*20 ))
+        inputs.addValueInput('width', "Width", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*2 ))
+        inputs.addValueInput('height', "Height", defaultLengthUnits, adsk.core.ValueInput.createByReal(2 * 2.54))
+        inputs.addValueInput('spr_width', "Sprocket One Width", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*2 ))
+        inputs.addValueInput('spr_diam', "Sprocket One Diameter", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*2 ))
+        inputs.addBoolValueInput('use_2_sprockets', "Sprockets on Both Ends?", True)
+        inputs.addValueInput('spr_2_width', "Sprocket Two Diameter", defaultLengthUnits, adsk.core.ValueInput.createByReal(2.54*2 ))
+        inputs.addValueInput('spr_2_diam', "Sprocket Two Width", defaultLengthUnits, adsk.core.ValueInput.createByReal(2 * 2.54))
+        
+    except Exception as ex:
+        ui.messageBox(ex)
     
-    inputs.addValueInput("max_extension", "Max Extension", 'in', adsk.core.ValueInput.createByReal(48*2.54))
-    inputs.addValueInput("carriage_height", "Carriage Height", 'in', adsk.core.ValueInput.createByReal(5*2.54))
-    inputs.addValueInput("carriage_width", "Carriage Width", 'in', adsk.core.ValueInput.createByReal(5*2.54))
 
+
+    
+
+    
 
     # TODO Connect to the events that are needed by this command.
     futil.add_handler(args.command.execute, command_execute, local_handlers=local_handlers)
@@ -107,93 +126,45 @@ def command_execute(args: adsk.core.CommandEventArgs):
     # General logging for debug.
     futil.log(f'{CMD_NAME} Command Execute Event')
 
-    # TODO ******************************** Your code here ********************************
+    # TODO ******************************** Your code here ********************************   
 
     design = adsk.fusion.Design.cast(app.activeProduct)
     root = design.rootComponent
-
-    # Get a reference to your command's inputs.
-    inputs = args.command.commandInputs
-
-    stagesValueCommandInput : adsk.core.IntegerSliderCommandInput = inputs.itemById('stages')
-    stages = stagesValueCommandInput.valueOne
-    maxExtensionValueCommandInput: adsk.core.ValueCommandInput = inputs.itemById('max_extension')
-    maxExtension = maxExtensionValueCommandInput.value
-    carriageWidthCommandInput : adsk.core.ValueCommandInput = inputs.itemById('carriage_width')
-    carriageWidth = carriageWidthCommandInput.value
-    carriageHeightCommandInput : adsk.core.ValueCommandInput = inputs.itemById('carriage_height')
-    carriageHeight = carriageHeightCommandInput.value
-
-    carriageWidth /= 2.54
-    carriageHeight /= 2.54
-    maxExtension /= 2.54
-    maxExtension -= 7
-    stageHeight = maxExtension / stages + 6
-
-    if stageHeight < carriageHeight - 2:
-        ui.messageBox('Stages are too short! Either decrease Carriage Height or Number of Stages or Increase Extension Length')
-        return
-    if carriageHeight < 2 or carriageWidth < 2:
-        ui.messageBox(f"Carriage Height of {carriageHeight} in or Carriage Width of {carriageWidth} in is too small! Please increase its size")
-        return
-    
-
-    stageReferencePoint = adsk.core.Point3D.create(0,0,0)
-
-    workingOcc = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-    workingComp = workingOcc.component
-    workingOcc.activate()
-
-    
-    
-
-    instantiatedStages = []
     try:
-        carriageOcc = workingComp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-        carriageComp = carriageOcc.component
-        carriageOcc.activate()
-        carriageSketch = carriageComp.sketches.add(root.xYConstructionPlane)
-        carriageTopLeft = pointFromOffset(stageReferencePoint, 0.5, carriageHeight)
-        carriageSketch.sketchCurves.sketchLines.addTwoPointRectangle(carriageTopLeft, pointFromOffset(carriageTopLeft, carriageWidth, -carriageHeight))
-        carriageExtrudeInput = carriageComp.features.extrudeFeatures.createInput(carriageSketch.profiles.item(0), adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
-        carriageExtrudeInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(2.54 * 2)), adsk.fusion.ExtentDirections.PositiveExtentDirection)
-        carriageComp.features.extrudeFeatures.add(carriageExtrudeInput)
-        instantiatedStages.append(carriageOcc)
-        
-        for stage in range(stages):
-            currentOcc = workingComp.occurrences.addNewComponent(adsk.core.Matrix3D.create())
-            currentComp = currentOcc.component
-            currentOcc.activate()
-            currentSketch = currentComp.sketches.add(root.xYConstructionPlane, currentOcc)
-            bottomRailLeftTopPoint = stageReferencePoint.copy()
-            bottomRailLeftTopPoint.translateBy(v3.create(-1.5*2.54*stage, -2.54*stage, 0))
-            currentSketch.sketchCurves.sketchLines.addTwoPointRectangle(bottomRailLeftTopPoint, pointFromOffset(bottomRailLeftTopPoint, carriageWidth + 1 + (3 * stage), -1))
-            currentSketch.sketchCurves.sketchLines.addTwoPointRectangle(pointFromOffset(bottomRailLeftTopPoint, -1, -1), pointFromOffset(bottomRailLeftTopPoint, 0, stageHeight - 1)) 
-            bottomRailTopRightPoint = pointFromOffset(bottomRailLeftTopPoint, carriageWidth + 1 + 3*stage, 0 )
-            currentSketch.sketchCurves.sketchLines.addTwoPointRectangle(pointFromOffset(bottomRailTopRightPoint, 1, -1), pointFromOffset(bottomRailTopRightPoint, 0, stageHeight - 1))
-            profileCollection = adsk.core.ObjectCollection.create()
-            for profile in currentSketch.profiles:
-                profileCollection.add(profile)
-            extrudedInput = currentComp.features.extrudeFeatures.createInput(profileCollection, adsk.fusion.FeatureOperations.NewBodyFeatureOperation)
-            extrudedInput.setOneSideExtent(adsk.fusion.DistanceExtentDefinition.create(adsk.core.ValueInput.createByReal(2.54*2)), adsk.fusion.ExtentDirections.PositiveExtentDirection)
-            currentComp.features.extrudeFeatures.add(extrudedInput)
-            instantiatedStages.append(currentOcc)
-        for i in range(len(instantiatedStages )-1):
-            weirdShit:adsk.fusion.Occurrence = instantiatedStages[i]
-            sliderJointInput = workingComp.asBuiltJoints.createInput(instantiatedStages[i], instantiatedStages[i+1], adsk.fusion.JointGeometry.createByPoint(weirdShit.bRepBodies.item(0).faces.item(0).vertices.item(0)))
-            sliderJointInput.setAsSliderJointMotion(adsk.fusion.JointDirections.YAxisJointDirection)
-            
-            limits : adsk.fusion.SliderJointMotion  = currentComp.asBuiltJoints.add(sliderJointInput).jointMotion
-            
-            limits.slideLimits.isMaximumValueEnabled = True
-            limits.slideLimits.isMinimumValueEnabled = True
-            limits.slideLimits.maximumValue = (stageHeight - 6  - 1) * 2.54
-            limits.slideLimits.minimumValue = 0
-            if i == 0: limits.slideLimits.maximumValue = (stageHeight - 1 - carriageHeight) * 2.54
-        
+        inputs = args.command.commandInputs
+
+        # Get a reference to your command's inputs.
+        type_input = inputs.itemById('type')
+        structure_type = type_input.selectedItem.name  # "Rectangular" or "Cylindrical"
+
+        # Extract value inputs (these return values in internal cm units)
+        length = inputs.itemById('length').value
+        width = inputs.itemById('width').value
+        height = inputs.itemById('height').value
+
+        spr_width = inputs.itemById('spr_width').value
+        spr_diam = inputs.itemById('spr_diam').value
+
+        use_2_sprockets = inputs.itemById('use_2_sprockets').value  # returns True/False
+
+        spr_2_width = inputs.itemById('spr_2_width').value
+        spr_2_diam = inputs.itemById('spr_2_diam').value
+
+        occ = root.occurrences.addNewComponent(adsk.core.Matrix3D.create())
+        comp = occ.component
+
+        occ.activate()
+
+        futil.create_tube(width, length, height, comp.xZConstructionPlane, occ, cylindrical=(structure_type == "Cylindrical"))
+        futil.create_tube(spr_diam/2, spr_width/2, spr_diam/2, comp.xYConstructionPlane, occ, cylindrical=True, extensionDir=adsk.fusion.ExtentDirections.SymmetricExtentDirection, extrudeOperation=adsk.fusion.FeatureOperations.JoinFeatureOperation)
+        if use_2_sprockets:
+                futil.create_tube(spr_2_diam/2, spr_2_width/2, spr_2_diam/2, comp.xYConstructionPlane, occ, cylindrical=True, extensionDir=adsk.fusion.ExtentDirections.SymmetricExtentDirection,startPoint= futil.pointFromOffset(futil.pZero,  0, length/2.54),extrudeOperation=adsk.fusion.FeatureOperations.JoinFeatureOperation)
+
+      
+
+        design.activateRootComponent()
     except Exception as ex:
-        ui.messageBox(str(ex.__cause__) + ' ' + str(ex))
-        
+        ui.messageBox(f"{ex} {ex.__traceback__.tb_lineno}")
 
         
 

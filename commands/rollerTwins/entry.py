@@ -11,7 +11,7 @@ ui = app.userInterface
 
 # TODO *** Specify the command identity information. ***
 CMD_ID = f'{config.COMPANY_NAME}_{config.ADDIN_NAME}_Rollers'
-CMD_NAME = 'Single/Double Rollers'
+CMD_NAME = 'Rollers Renderer'
 CMD_Description = 'Creates a pair (or a single) of rollers with a plate joining them'
 
 # Specify that the command will be promoted to the panel.
